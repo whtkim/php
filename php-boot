@@ -1,0 +1,47 @@
+#!/bin/bash
+
+opcacheCheck(){
+  if [ "$APP_ENV" = 'production' ];then
+    sed -i 's/^;opcache.enable=1/opcache.enable=1/g' "$PHP_ROOT_DIR"/php.ini
+  else
+    sed -i 's/^[ ]*opcache.enable=1/;opcache.enable=1/g' "$PHP_ROOT_DIR"/php.ini
+  fi
+}
+
+hyperfCheck(){
+  if [ "$PHP_EXEC_MODE" = 'hyperf' ] && [ ! -f "$PHP_ROOT_DIR"/conf.d/hyperf.ini ]; then
+    echo "swoole.use_shortname = 'Off'" > "$PHP_ROOT_DIR"/conf.d/hyperf.ini
+  elif [ "$PHP_EXEC_MODE" != 'hyperf' ] && [ -f "$PHP_ROOT_DIR"/conf.d/hyperf.ini ]; then
+    rm -rf "$PHP_ROOT_DIR"/conf.d/hyperf.ini
+  fi
+}
+
+bootstrap(){
+  #开关opcache
+  opcacheCheck
+
+  #hyperf模式检查
+  hyperfCheck
+
+  #启用PHP
+  case "$PHP_EXEC_MODE" in
+  fpm)
+    php-fpm -F
+    ;;
+  hyperf)
+    if [ "$APP_ENV" = 'dev' ]; then
+      php bin/watch -c
+    else
+      php bin/hyperf.php start
+    fi
+    ;;
+  *)
+    customCommand="tail -f /dev/null"
+    if [ -n "$*" ]; then
+      customCommand=$*
+    fi
+    eval "$customCommand"
+  esac
+}
+
+bootstrap "$*"
